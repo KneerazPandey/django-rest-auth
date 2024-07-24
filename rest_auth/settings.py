@@ -140,5 +140,11 @@ CELERY_BROKER_URL = 'redis://redis:6379/0'
 
 # Django Rest Framework Configurations
 REST_FRAMEWORK = {
-    'NON_FIELD_ERRORS_KEY': 'error'
+    'NON_FIELD_ERRORS_KEY': 'error',
+    'DEFAULT_AUTHENTIATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    'DEFAULT_PERMISSIONS_CLASSES': [
+        'rest_framework.permission.IsAuthenticated',
+    ]
 }

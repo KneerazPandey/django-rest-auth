@@ -4,10 +4,10 @@ from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from . serializers import (
     UserRegistrationSerializer, VerifyUserRegistrationOtpSerializer, 
-    ResendUserRegistrationOtpSerializer
+    ResendUserRegistrationOtpSerializer, UserLoginSerializer, UserResponseSerializer
 )
 from . models import (
-    UserRegistrationOtp
+    UserRegistrationOtp, User
 )
 
 
@@ -54,3 +54,18 @@ class ResendUserRegistrationOtpAPIView(generics.GenericAPIView):
             email = serializer.validated_data.get('email')
             return Response(data={'success': f'The new email verification opt has been sent to your email address: {email}'}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+
+class UserLoginAPIView(generics.GenericAPIView):
+    serializer_class = UserLoginSerializer
+    permission_classes = [AllowAny]
+    
+    def post(self, request: Request, *args, **kwargs):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            user = User.objects.get(email=serializer.validated_data.get('email'))
+            response = UserResponseSerializer(user).data
+            
+            return Response(data=response, status=status.HTTP_200_OK)
+        return Response(data=serializer.errors, status=status.HTTP_200_OK)

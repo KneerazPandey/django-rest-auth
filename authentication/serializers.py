@@ -4,6 +4,7 @@ from . utils.otp import Otp
 from . task import send_email
 from django.utils import timezone
 import datetime
+from django.contrib.auth import authenticate
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -22,7 +23,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return super().validate(attrs)
         
     def create(self, validated_data: dict):
-        user = User.objects.create(**validated_data)
+        user = User.objects.create_user(**validated_data)
         otp = Otp.create_user_registration_otp(for_user=user)
         email_subject = 'Account Verification - (One Time Password) for Rest Auth'
         email_to = [user.email]
@@ -95,3 +96,29 @@ class ResendUserRegistrationOtpSerializer(serializers.Serializer):
             return super().validate(attrs) 
         except User.DoesNotExist:
             raise serializers.ValidationError('Cannot send the verification email as this email is not registered before.')
+        
+        
+
+class UserLoginSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=255)
+    password = serializers.CharField(max_length=50, min_length=4, write_only=True)
+        
+    def validate(self, attrs: dict):
+        email = attrs.get('email', '')
+        password = attrs.get('password', '')
+        user = authenticate(email=email, password=password)
+        if user is None:
+            raise serializers.ValidationError('Inalid email or password')
+        if not user.is_verified:
+            raise serializers.ValidationError("You haven't verified your email address. Please verified your email address first.")
+        
+        return super().validate(attrs)
+    
+
+class UserResponseSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+    tokens = serializers.DictField(read_only=True)
+    
+    class Meta:
+        model = User 
+        fields = '__all__'
