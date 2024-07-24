@@ -137,3 +137,8 @@ EMAIL_HOST_PASSWORD=config('EMAIL_HOST_PASSWORD')
 
 # Django Celery Configurations
 CELERY_BROKER_URL = 'redis://redis:6379/0'
+
+# Django Rest Framework Configurations
+REST_FRAMEWORK = {
+    'NON_FIELD_ERRORS_KEY': 'error'
+}

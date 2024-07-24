@@ -2,6 +2,8 @@ from rest_framework import serializers
 from . models import User 
 from . utils.otp import Otp
 from . task import send_email
+from django.utils import timezone
+import datetime
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -33,3 +35,63 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         send_email.delay(data)
         
         return user 
+    
+    
+
+class VerifyUserRegistrationOtpSerializer(serializers.Serializer):
+    otp = serializers.IntegerField(required=True)
+    
+    def validate(self, attrs: dict):
+        from . models import UserRegistrationOtp
+        
+        otp_to_validate = attrs.get('otp', '')
+        try:
+            existing_otp = UserRegistrationOtp.objects.get(otp=otp_to_validate)
+            if existing_otp.expired:
+                raise serializers.ValidationError('Otp Expired. The otp you are using has already been expired.')
+            current_date = timezone.now()
+            existing_otp_expired_date = existing_otp.created_at + datetime.timedelta(minutes=3) #* After three minutes the OTP will expire
+            if existing_otp_expired_date > current_date:
+                if existing_otp.user.is_verified:
+                    raise serializers.ValidationError('You have already verified your registration email.')
+                return attrs 
+            else:
+                existing_otp.expired = True
+                existing_otp.save()
+                raise serializers.ValidationError('Your OTP has expired. Please ask new OTP for your registration.')
+        except UserRegistrationOtp.DoesNotExist:
+            raise serializers.ValidationError('Invalid Otp. The Otp you are using is not valid')
+    
+    
+
+class ResendUserRegistrationOtpSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=255)
+    
+    def validate(self, attrs: dict):
+        from . models import UserRegistrationOtp
+        
+        email = attrs.get('email', '')
+        try:
+            user = User.objects.get(email=email)
+            
+            if user.is_verified:
+                raise serializers.ValidationError('You have already verified your registration email. Not need to verified it twice.')
+            
+            #? Deleting all the other existing otp before sending the new one. As old otp no longer works
+            otps = UserRegistrationOtp.objects.filter(user=user)
+            otps.delete()
+            
+            otp = Otp.create_user_registration_otp(for_user=user)
+            email_subject = 'Account Verification - (One Time Password) for Rest Auth'
+            email_to = [user.email]
+            email_body = f'Hi {user.username}. \n Below is the one time password for account verification. The otp will expire in 2 minutes. \n\n OPT: {otp}'
+            data = {
+                'email_subject': email_subject,
+                'email_body': email_body,
+                'email_to': email_to
+            }
+            send_email.delay(data)
+            
+            return super().validate(attrs) 
+        except User.DoesNotExist:
+            raise serializers.ValidationError('Cannot send the verification email as this email is not registered before.')

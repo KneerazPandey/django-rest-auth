@@ -27,7 +27,8 @@ class Otp:
             if not queryset:
                 return otp
             
-            for registration_otp in queryset:
-                if registration_otp.otp != otp:
-                    return otp
+            try:
+                queryset.get(otp=otp)
+            except Exception:
+                return otp
     
