@@ -23,3 +23,15 @@ services:
     ports:
       - 6379:6379
     container_name: redis_container
+
+  celery:
+    restart: always
+    build:
+      context: .
+    volumes:
+      - .:/app
+    container_name: celery_container
+    command: celery -A rest_auth worker -l info
+    depends_on:
+      - auth_server
+      - redis

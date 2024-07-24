@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from . models import User 
 from . utils.otp import Otp
-from .utils.email import send_email
+from . task import send_email
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -30,6 +30,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             'email_body': email_body,
             'email_to': email_to
         }
-        send_email(data=data)
+        send_email.delay(data)
         
         return user 
