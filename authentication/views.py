@@ -6,7 +6,7 @@ from . serializers import (
     UserRegistrationSerializer, VerifyUserRegistrationOtpSerializer, 
     ResendUserRegistrationOtpSerializer, UserLoginSerializer, UserResponseSerializer,
     InitiateForgetPasswordRequestSerializer, VerifyForgetPasswordOtpSerializer, 
-    ResetForgetPasswordSerializer
+    ResetForgetPasswordSerializer, ChangePasswordSerializer
 )
 from . models import (
     UserRegistrationOtp, User
@@ -116,3 +116,21 @@ class ResetForgetPasswordAPIView(generics.GenericAPIView):
             data = UserResponseSerializer(user).data
             return Response(data=data, status=status.HTTP_200_OK)
         return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST) 
+    
+    
+
+class ChangePasswordAPIView(generics.GenericAPIView):
+    serializer_class= ChangePasswordSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request: Request, *args, **kwargs):
+        context = {
+            'request': request
+        }
+        serializer = self.serializer_class(data=request.data, context=context)
+        if serializer.is_valid():
+            serializer.change_password()
+            data = UserResponseSerializer(request.user).data
+            return Response(data=data, status=status.HTTP_200_OK)
+        return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    

@@ -3,7 +3,7 @@ from . views import (
     UserRegistrationAPIView, VerifyUserRegistrationOtpAPIView,
     ResendUserRegistrationOtpAPIView, UserLoginAPIView, 
     InitiateForgetPasswordRequestAPIView, VerifyForgetPasswordOtpAPIView,
-    ResetForgetPasswordAPIView
+    ResetForgetPasswordAPIView, ChangePasswordAPIView
 )
 
 
@@ -21,5 +21,7 @@ urlpatterns = [
     path('verify/forget-password-otp/', VerifyForgetPasswordOtpAPIView.as_view(), name='verify-forget-password-otp'),
     
     path('reset/forget-password/', ResetForgetPasswordAPIView.as_view(), name='reset-forget-password'),
+    
+    path('change/password/', ChangePasswordAPIView.as_view(), name='change-password'),
 
 ]

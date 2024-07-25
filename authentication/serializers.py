@@ -5,6 +5,7 @@ from . task import send_email
 from django.utils import timezone
 import datetime
 from django.contrib.auth import authenticate
+from django.contrib.auth.hashers import check_password
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -193,7 +194,38 @@ class ResetForgetPasswordSerializer(serializers.Serializer):
         user.set_password(self.validated_data.get('password'))
         user.save()
         return user 
+
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(max_length=50, min_length=2, required=True)
+    new_password = serializers.CharField(max_length=50, min_length=2, required=True)
+    confirm_new_password = serializers.CharField(max_length=50, min_length=2, required=True)
+
+    def validate(self, attrs: dict):
+        try:
+            current_password = attrs.get('current_password', '')
+            new_password = attrs.get('new_password', '')
+            confirm_new_password = attrs.get('confirm_new_password', '')
+            request = self.context.get('request')
+            user = request.user 
             
+            if new_password != confirm_new_password:
+                raise serializers.ValidationError('New password and confirm password does not match')
+            if not check_password(current_password, user.password):
+                raise serializers.ValidationError('The current password does not match')
+            
+            return super().validate(attrs)
+        except Exception:
+            raise serializers.ValidationError('Error occured while changing password. Please try again.')
+    
+    def change_password(self):
+        new_password = self.validated_data.get('new_password')
+        user = self.context.get('request').user
+        user.set_password(new_password)
+        user.save()
+        return user 
+    
 
 class UserResponseSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
