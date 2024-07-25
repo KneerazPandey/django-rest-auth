@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from . models import User 
+from . models import User, ForgetPasswordOtp
 from . utils.otp import Otp
 from . task import send_email
 from django.utils import timezone
@@ -113,7 +113,87 @@ class UserLoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("You haven't verified your email address. Please verified your email address first.")
         
         return super().validate(attrs)
+
+
+
+class InitiateForgetPasswordRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=255, required=True)
     
+    def validate(self, attrs: dict):
+        from . models import ForgetPasswordOtp
+        try:
+            user = User.objects.get(email=attrs.get('email', ''))
+            
+            #? Deleting all the previous OTP related to the user
+            otps = ForgetPasswordOtp.objects.filter(user=user)
+            otps.delete()
+            
+            otp = Otp.create_forget_password_otp(for_user=user)
+            email_subject = 'Your one time password for Reseting Rest Auth Password'
+            email_to = [user.email]
+            email_body = f'Hi {user.username}. \n Below is the one time password for reseting your password. The otp will expire in 2 minutes. \n\n OPT: {otp}'
+            data = {
+                'email_subject': email_subject,
+                'email_body': email_body,
+                'email_to': email_to
+            }
+            send_email.delay(data)
+            
+            return super().validate(attrs)
+        except User.DoesNotExist:
+            raise serializers.ValidationError('Invalid email. This email is not registered in the system.')
+
+
+
+class VerifyForgetPasswordOtpSerializer(serializers.Serializer):
+    otp = serializers.IntegerField(required=True)
+    
+    def validate(self, attrs: dict):
+        from . models import ForgetPasswordOtp
+        try:
+            otp_to_validate = attrs.get('otp', 0)
+            existing_otp = ForgetPasswordOtp.objects.get(otp=otp_to_validate)
+            
+            if existing_otp.expired:
+                raise serializers.ValidationError('Otp Expired. The Otp you have used is already expired.')
+            
+            current_date = timezone.now()
+            otp_expired_date = existing_otp.created_at + timezone.timedelta(minutes=3)
+            if current_date > otp_expired_date:
+                existing_otp.expired = True
+                existing_otp.save()
+                raise serializers.ValidationError('Otp Expired. The Otp you have used is already expired.') 
+            authenticate(email=existing_otp.user.email, password=existing_otp.user.email)
+            return super().validate(attrs)
+        except Exception:
+            raise serializers.ValidationError('Invalid Otp. The Otp you have used is either invalid or expired.')
+
+    def get_otp_verified_user(self):
+        '''This method should only vall ones the serializer is valid'''
+        otp = self.validated_data.get('otp')
+        existing_otp = ForgetPasswordOtp.objects.get(otp=otp)
+        return existing_otp.user 
+
+
+class ResetForgetPasswordSerializer(serializers.Serializer):
+    password = serializers.CharField(max_length=50, min_length=2, required=True)
+    confirm_password = serializers.CharField(max_length=50, min_length=3, required=True)
+    
+    def validate(self, attrs: dict):
+        password = attrs.get('password', '')
+        confirm_password = attrs.get('confirm_password', '')
+        if password == confirm_password:
+            return super().validate(attrs)
+        raise serializers.ValidationError('Password and Confirm Password must match')
+    
+    def get_user_after_resetting_password(self):
+        '''This method only works ones the data is validated only'''
+        request = self.context.get('request')
+        user = request.user 
+        user.set_password(self.validated_data.get('password'))
+        user.save()
+        return user 
+            
 
 class UserResponseSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)

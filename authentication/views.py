@@ -1,10 +1,12 @@
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework import generics, status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from . serializers import (
     UserRegistrationSerializer, VerifyUserRegistrationOtpSerializer, 
-    ResendUserRegistrationOtpSerializer, UserLoginSerializer, UserResponseSerializer
+    ResendUserRegistrationOtpSerializer, UserLoginSerializer, UserResponseSerializer,
+    InitiateForgetPasswordRequestSerializer, VerifyForgetPasswordOtpSerializer, 
+    ResetForgetPasswordSerializer
 )
 from . models import (
     UserRegistrationOtp, User
@@ -69,3 +71,48 @@ class UserLoginAPIView(generics.GenericAPIView):
             
             return Response(data=response, status=status.HTTP_200_OK)
         return Response(data=serializer.errors, status=status.HTTP_200_OK)
+    
+
+
+class InitiateForgetPasswordRequestAPIView(generics.GenericAPIView):
+    serializer_class = InitiateForgetPasswordRequestSerializer
+    permission_classes = [AllowAny]
+    
+    def post(self, request: Request, *args, **kwargs):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data.get('email')
+            data = {
+                'success': 'The forget password OTP has been sent successfully to your email address.',
+                'email': email
+            }  
+            return Response(data=data, status=status.HTTP_200_OK)
+        return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class VerifyForgetPasswordOtpAPIView(generics.GenericAPIView):
+    serializer_class = VerifyForgetPasswordOtpSerializer
+    permission_classes = [AllowAny]
+    
+    def post(self, request: Request, *args, **kwargs):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            user = serializer.get_otp_verified_user()
+            data = UserResponseSerializer(user).data
+            return Response(data=data, status=status.HTTP_200_OK)
+        return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST) 
+    
+    
+
+class ResetForgetPasswordAPIView(generics.GenericAPIView):
+    serializer_class = ResetForgetPasswordSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request: Request, *args, **kwargs):
+        serializer = self.serializer_class(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            user = serializer.get_user_after_resetting_password()
+            data = UserResponseSerializer(user).data
+            return Response(data=data, status=status.HTTP_200_OK)
+        return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST) 
